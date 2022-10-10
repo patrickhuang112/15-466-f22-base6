@@ -1,4 +1,4 @@
-# Fasterfingers
+# FasterFingers
 
 Author: pbhuang
 
