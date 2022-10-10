@@ -109,6 +109,10 @@ void PlayMode::update(float elapsed) {
 	}, 0.0);
 
 	player.oppscore = playerconn.opp_score;
+	if (playerconn.game_over) {
+		game_over = true;	
+		return;
+	}
 	while (!playerconn.s2c_delete.empty()) {
 		std::string s = playerconn.s2c_delete.front();
 		playerconn.s2c_delete.pop_front();
@@ -142,47 +146,76 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		0.0f, 0.0f, 0.0f, 1.0f
 	));
 
-	for (auto w : player.words) {
-		const std::string& s = w->s; 
-		// Skip the first visited node which is always the root
-		bool matching = true;
-		size_t matched = 0;
-		for (size_t i = 1; i < player.visited.size(); ++i) {
-			auto trienode = player.visited[i];
-			if (i-1 >= s.length() || trienode->c != s[i-1]) {
-				matching = false;	
-				break;
-			}
-			++matched;
+	if (game_over) {
+		constexpr float text_size = 0.15f;
+		// calculated from pure experimentation since it doesn't make sense 
+		// logically
+		constexpr float text_size_divisor_for_mid = 5.3f;
+		bool won = player.score >= player.oppscore ? true : false;
+		glm::vec4 color;
+		std::string wintext;
+		if (won) {
+			wintext = "You win!!";
+			color = Gamel::CORRECT_COLOR;
 		}
-		glm::vec4 word_color = w->lifetime == Gamel::DEFAULT_WORD_LIFETIME ? Gamel::DEFAULT_COLOR : Gamel::OPPONENT_COLOR;
-		for (size_t i = 0; i < s.length(); ++i) {
-			float x = w->pos.x + i * Gamel::LETTER_WIDTH;
-			glm::uvec4 color;
-			if (matching && i < matched) {
-				color = Gamel::CORRECT_COLOR;
-			}	
-			else {
-				color = word_color;
-			}
-			// Assumming only alpha characters
-			std::string text(1, s[i] - Gamel::LOWER_TO_UPPER_SHIFT); 
-			lines.draw_text(text,
-			glm::vec3(x, w->pos.y, 0.0),
-			glm::vec3(Gamel::TEXT_SIZE, 0.0f, 0.0f), glm::vec3(0.0f, Gamel::TEXT_SIZE, 0.0f),
+		else {
+			wintext = "You lost :(";
+			color = Gamel::OPPONENT_COLOR;
+		}
+		lines.draw_text(wintext,
+			glm::vec3(0.f - (static_cast<float>(wintext.length()) * text_size / text_size_divisor_for_mid), 0.0f, 0.0),
+			glm::vec3(text_size, 0.0f, 0.0f), glm::vec3(0.0f, text_size, 0.0f),
 			color);
-		}
+
+		std::string text = "Your score: " + std::to_string(player.score)  + "  Opponent's score: " + std::to_string(player.oppscore);
+		lines.draw_text(text,
+			glm::vec3(0.f - (static_cast<float>(text.length()) * text_size / text_size_divisor_for_mid), -0.2f, 0.0),
+			glm::vec3(text_size, 0.0f, 0.0f), glm::vec3(0.0f, text_size, 0.0f),
+			color);
+		return;	
 	}
+	else {
+		for (auto w : player.words) {
+			const std::string& s = w->s; 
+			// Skip the first visited node which is always the root
+			bool matching = true;
+			size_t matched = 0;
+			for (size_t i = 1; i < player.visited.size(); ++i) {
+				auto trienode = player.visited[i];
+				if (i-1 >= s.length() || trienode->c != s[i-1]) {
+					matching = false;	
+					break;
+				}
+				++matched;
+			}
+			glm::vec4 word_color = w->lifetime == Gamel::DEFAULT_WORD_LIFETIME ? Gamel::DEFAULT_COLOR : Gamel::OPPONENT_COLOR;
+			for (size_t i = 0; i < s.length(); ++i) {
+				float x = w->pos.x + i * Gamel::LETTER_WIDTH;
+				glm::uvec4 color;
+				if (matching && i < matched) {
+					color = Gamel::CORRECT_COLOR;
+				}	
+				else {
+					color = word_color;
+				}
+				// Assumming only alpha characters
+				std::string text(1, s[i] - Gamel::LOWER_TO_UPPER_SHIFT); 
+				lines.draw_text(text,
+				glm::vec3(x, w->pos.y, 0.0),
+				glm::vec3(Gamel::TEXT_SIZE, 0.0f, 0.0f), glm::vec3(0.0f, Gamel::TEXT_SIZE, 0.0f),
+				color);
+			}
+		}
 
-	// Draw Score at bottom
-	constexpr float H = Gamel::HUD_SIZE;
-	float ofs = 2.0f / drawable_size.y;
-	std::string text = "Your score: " + std::to_string(player.score)  + "  Opponent's score: " + std::to_string(player.oppscore);
-	lines.draw_text(text,
-		glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
-		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-		Gamel::DEFAULT_COLOR);
-
+		// Draw Score at bottom
+		constexpr float H = Gamel::HUD_SIZE;
+		float ofs = 2.0f / drawable_size.y;
+		std::string text = "Your score: " + std::to_string(player.score)  + "  Opponent's score: " + std::to_string(player.oppscore);
+		lines.draw_text(text,
+			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			Gamel::DEFAULT_COLOR);
+	}
 	GL_ERRORS();
 
 

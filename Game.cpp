@@ -151,7 +151,11 @@ void Game::remove_player(Player *player) {
 
 void Game::update(float elapsed) {
 	// Dont do anything until we have two players
-	if (p1 == nullptr || p2 == nullptr) {
+	if (p1 == nullptr || p2 == nullptr || game_over) {
+		return;
+	}
+	if (total_elapsed > Gamel::GAME_LENGTH) {
+		game_over = true;
 		return;
 	}
 	p2->opp_score = p1->self_score;	
@@ -226,6 +230,11 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		]
 	*/
 
+	if (game_over) {
+		connection.send(Message::S2C_Over);	
+		return;
+	}
+
 	connection.send(Message::S2C_State);
 
 	float_to_int scoreu;	
@@ -246,7 +255,6 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	}
 	else {
 		std::string s = p->s2c_self.front();	
-		printf("Send state1: %s\n", s.c_str());
 		uint8_t len = static_cast<uint8_t>(s.length());
 		connection.send(len);
 		for (char c : s) {
@@ -261,7 +269,6 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	}
 	else {
 		std::string s = p->s2c_opp.front();	
-		printf("Send state2: %s\n", s.c_str());
 		uint8_t len = static_cast<uint8_t>(s.length());
 		connection.send(len);
 		for (char c : s) {
@@ -276,7 +283,6 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	}
 	else {
 		std::string s = p->s2c_delete.front();	
-		printf("Send state3: %s\n", s.c_str());
 		uint8_t len = static_cast<uint8_t>(s.length());
 		connection.send(len);
 		for (char c : s) {
@@ -290,9 +296,10 @@ bool Game::recv_state_message(Connection *connection_, Player *p) {
 	assert(connection_);
 	auto &connection = *connection_;
 	auto &recv_buffer = connection.recv_buffer;
-
-
-	float_to_int scoreu;	
+	if (!recv_buffer.empty() && recv_buffer[0] == uint8_t(Message::S2C_Over)) {
+		p->game_over = true;
+		return false;
+	}
 	if (recv_buffer.size() < 8) {
 		return false;	
 	}
@@ -301,6 +308,7 @@ bool Game::recv_state_message(Connection *connection_, Player *p) {
 				  |	(uint32_t(recv_buffer[2]) << 16)
 	              | (uint32_t(recv_buffer[3]) << 8)
 	              |  uint32_t(recv_buffer[4]);
+	float_to_int scoreu;
 	scoreu.i = size;
 	bool something = false;	
 	char chars[BIG_ENOUGH_ARRAY];
@@ -329,7 +337,6 @@ bool Game::recv_state_message(Connection *connection_, Player *p) {
 		std::string opps = std::string(chars);
 		something = true;
 		p->s2c_opp.emplace_back(opps);
-		printf("HERE2\n");
 	}
 
 	size_t deletelen = recv_buffer[message_size];
@@ -343,7 +350,6 @@ bool Game::recv_state_message(Connection *connection_, Player *p) {
 		std::string deletes = std::string(chars);
 		something = true;
 		p->s2c_delete.emplace_back(deletes);
-		printf("HERE3\n");
 	}	
 
 	p->opp_score = scoreu.f;

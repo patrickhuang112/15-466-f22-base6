@@ -19,7 +19,7 @@ struct PlayMode : Mode {
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
 	//----- game state -----
-
+	bool game_over = false;
 	Gamel::Playerl player;
 
 	//input tracking for local player:

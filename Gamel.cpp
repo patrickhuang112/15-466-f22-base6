@@ -19,9 +19,6 @@ void Playerl::return_y(float y) {
 void Playerl::add_word(const std::string& s, bool is_steal){
     float lifetime = is_steal ? OPP_WORD_LIFETIME : DEFAULT_WORD_LIFETIME;
     words.emplace_back(std::make_shared<Wordl>(s, lifetime, get_y()));
-    if (is_steal) {
-        printf("OPP RECEIVED AND ADDED: %s\n", s.c_str());
-    }
     std::shared_ptr<TrieNode> cur = root; 
     for (size_t i = 0; i < s.length(); ++i) {
         char c = s[i];
@@ -59,18 +56,27 @@ void Playerl::move_words(float elapsed) {
             newlist.emplace_back(w); 
             if (w->lifetime == DEFAULT_WORD_LIFETIME && w->remaining > DEFAULT_WORD_LIFETIME / 2.f && !w->sent_to_opp){
                 words_to_send_opp.emplace_back(w->s); 
-                printf("FIrst detect\n");
                 w->sent_to_opp = true;
             }
         }
         else {
             return_y(w->pos.y);
             if (w->lifetime == DEFAULT_WORD_LIFETIME) {
-                printf("REG DEAD\n");
                 words_to_send_self.emplace_back(w->s);
             }
-            else {
-                printf("OPP DEAD\n");
+            const std::string& s = w->s; 
+			// Skip the first visited node which is always the root
+			bool matching = true;
+			for (size_t i = 1; i < visited.size(); ++i) {
+				auto trienode = visited[i];
+				if (i-1 >= s.length() || trienode->c != s[i-1]) {
+					matching = false;	
+					break;
+				}
+			}
+            if (matching) {
+                visited.clear(); 
+                visited.emplace_back(root);
             }
         }
         

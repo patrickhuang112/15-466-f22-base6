@@ -20,6 +20,7 @@ struct Connection;
 enum class Message : uint8_t {
 	C2S_Controls = 1, //Greg!
 	S2C_State = 's',
+	S2C_Over = 2,
 	//...
 };
 
@@ -50,6 +51,7 @@ struct Player {
 	Gamel::Playerl p;
 	std::string name = "";
 
+	bool game_over = false;	
 
 	// Connection related info
 	std::list<std::string> s2c_opp;
@@ -73,6 +75,7 @@ struct Game {
 
 	float total_elapsed = 0.f;
 	bool can_make_word = true;
+	bool game_over = false;
 
 	std::list< Player > players; //(using list so they can have stable addresses)
 	Player *spawn_player(); //add player the end of the players list (may also, e.g., play some spawn anim)

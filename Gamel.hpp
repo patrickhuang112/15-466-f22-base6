@@ -28,14 +28,15 @@ const glm::u8vec4 CORRECT_COLOR = glm::u8vec4(0x44, 0xed, 0x69, 0x00);
 const glm::u8vec4 DEFAULT_COLOR = glm::u8vec4(0xff, 0xff, 0xff, 0x00);
 const glm::u8vec4 SELECTED_COLOR = glm::u8vec4(0x9f, 0x00, 0xcc, 0x00); 
 constexpr char LOWER_TO_UPPER_SHIFT = 32;
-constexpr float DEFAULT_WORD_LIFETIME = 10.0f;
+constexpr float DEFAULT_WORD_LIFETIME = 6.0f;
 constexpr float OPP_WORD_LIFETIME = DEFAULT_WORD_LIFETIME / 2.f;
 constexpr float DEFAULT_WORD_X_POSITION = 1.75f;
 constexpr float LETTER_WIDTH = 0.06f;
 constexpr float TEXT_SIZE = 0.15f;
 constexpr float HUD_SIZE = 0.11f;
 constexpr float STEAL_MULTIPLIER = 1.5f;
-constexpr uint32_t NEW_WORD_CYCLE = 8;
+constexpr uint32_t NEW_WORD_CYCLE = 4;
+constexpr float GAME_LENGTH = 30.f;
 
 constexpr float YPOS1 = 0.f;
 constexpr float YPOS2 = 0.3f;
