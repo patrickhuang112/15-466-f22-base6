@@ -1,5 +1,6 @@
 #include "Mode.hpp"
 
+#include "Gamel.hpp"
 #include "Connection.hpp"
 #include "Game.hpp"
 
@@ -19,8 +20,10 @@ struct PlayMode : Mode {
 
 	//----- game state -----
 
+	Gamel::Playerl player;
+
 	//input tracking for local player:
-	Player::Controls controls;
+	Player playerconn;
 
 	//latest game state (from server):
 	Game game;

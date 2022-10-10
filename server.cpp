@@ -72,11 +72,17 @@ int main(int argc, char **argv) {
 					//client connected:
 
 					//create some player info for them:
-					connection_to_player.emplace(c, game.spawn_player());
+					Player *p = game.spawn_player();
+					connection_to_player.emplace(c, p);
+					if (game.p1 == nullptr) {
+						game.p1 = p;
+					}
+					else if (game.p1 != nullptr && game.p2 == nullptr) {
+						game.p2 = p;
+					}
 
 				} else if (evt == Connection::OnClose) {
 					//client disconnected:
-
 					remove_connection(c);
 
 				} else { assert(evt == Connection::OnRecv);
@@ -93,7 +99,7 @@ int main(int argc, char **argv) {
 						bool handled_message;
 						do {
 							handled_message = false;
-							if (player.controls.recv_controls_message(c)) handled_message = true;
+							if (player.recv_controls_message(c)) handled_message = true;
 							//TODO: extend for more message types as needed
 						} while (handled_message);
 					} catch (std::exception const &e) {

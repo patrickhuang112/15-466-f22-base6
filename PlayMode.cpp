@@ -9,7 +9,10 @@
 #include <glm/gtx/string_cast.hpp>
 
 #include <random>
+#include <algorithm>
 #include <array>
+#include <string>
+
 
 PlayMode::PlayMode(Client &client_) : client(client_) {
 }
@@ -18,64 +21,59 @@ PlayMode::~PlayMode() {
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
-
-	if (evt.type == SDL_KEYDOWN) {
-		if (evt.key.repeat) {
-			//ignore repeats
-		} else if (evt.key.keysym.sym == SDLK_a) {
-			controls.left.downs += 1;
-			controls.left.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_d) {
-			controls.right.downs += 1;
-			controls.right.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_w) {
-			controls.up.downs += 1;
-			controls.up.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_s) {
-			controls.down.downs += 1;
-			controls.down.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_SPACE) {
-			controls.jump.downs += 1;
-			controls.jump.pressed = true;
-			return true;
-		}
-	} else if (evt.type == SDL_KEYUP) {
-		if (evt.key.keysym.sym == SDLK_a) {
-			controls.left.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_d) {
-			controls.right.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_w) {
-			controls.up.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_s) {
-			controls.down.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_SPACE) {
-			controls.jump.pressed = false;
-			return true;
+	if (evt.type == SDL_KEYUP) {
+		switch(evt.key.keysym.sym) {
+			case SDLK_a:
+			case SDLK_b:
+			case SDLK_c:
+			case SDLK_d:
+			case SDLK_e:
+			case SDLK_f:
+			case SDLK_g:
+			case SDLK_h:
+			case SDLK_i:
+			case SDLK_j:
+			case SDLK_k:
+			case SDLK_l:
+			case SDLK_m:
+			case SDLK_n:
+			case SDLK_o:
+			case SDLK_p:
+			case SDLK_q:
+			case SDLK_r:
+			case SDLK_s:
+			case SDLK_t:
+			case SDLK_u:
+			case SDLK_v:
+			case SDLK_w:
+			case SDLK_x:
+			case SDLK_y:
+			case SDLK_z:
+			case SDLK_1:
+			case SDLK_2:
+			case SDLK_3:
+			case SDLK_4:
+			case SDLK_5:
+			case SDLK_6:
+			case SDLK_7:
+			case SDLK_8:
+			case SDLK_9:
+			case SDLK_0:
+				player.process_letter(static_cast<char>(evt.key.keysym.sym));
+				return true;	
 		}
 	}
-
 	return false;
 }
 
 void PlayMode::update(float elapsed) {
+	player.move_words(elapsed);
 
 	//queue data for sending to server:
-	controls.send_controls_message(&client.connection);
+	playerconn.self_score = player.score;	
+	playerconn.c2s_comp = "TESTING";
+	playerconn.send_controls_message(&client.connection);
 
-	//reset button press counters:
-	controls.left.downs = 0;
-	controls.right.downs = 0;
-	controls.up.downs = 0;
-	controls.down.downs = 0;
-	controls.jump.downs = 0;
 
 	//send/receive data:
 	client.poll([this](Connection *c, Connection::Event event){
@@ -90,7 +88,7 @@ void PlayMode::update(float elapsed) {
 			try {
 				do {
 					handled_message = false;
-					if (game.recv_state_message(c)) handled_message = true;
+					if (game.recv_state_message(c, &playerconn)) handled_message = true;
 				} while (handled_message);
 			} catch (std::exception const &e) {
 				std::cerr << "[" << c->socket << "] malformed message from server: " << e.what() << std::endl;
@@ -99,10 +97,97 @@ void PlayMode::update(float elapsed) {
 			}
 		}
 	}, 0.0);
+
+	if (playerconn.s2c_received) {
+		player.oppscore = playerconn.opp_score;
+		if (playerconn.s2c_delete != "" && player.has_word(playerconn.s2c_delete)) {
+			player.remove_word(playerconn.s2c_delete);
+			playerconn.s2c_delete = "";
+		}
+		if (playerconn.s2c_opp != "") {
+			player.add_word(playerconn.s2c_opp, true);
+			playerconn.s2c_opp = "";
+		}
+		if (playerconn.s2c_self != "") {
+			player.add_word(playerconn.s2c_opp, false);
+			playerconn.s2c_self = "";
+		}
+		playerconn.s2c_received = false;
+	}
+
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
+	glDisable(GL_DEPTH_TEST);
+	// Clear previously drawn text
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
 
+	float aspect = float(drawable_size.x) / float(drawable_size.y);
+	DrawLines lines(glm::mat4(
+		1.0f / aspect, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	));
+
+	for (auto w : player.words) {
+		const std::string& s = w->s; 
+		// Skip the first visited node which is always the root
+		bool matching = true;
+		size_t matched = 0;
+		for (size_t i = 1; i < player.visited.size(); ++i) {
+			auto trienode = player.visited[i];
+			if (i-1 >= s.length() || trienode->c != s[i-1]) {
+				matching = false;	
+				break;
+			}
+			++matched;
+		}
+		for (size_t i = 0; i < s.length(); ++i) {
+			float x = w->pos.x + i * Gamel::LETTER_WIDTH;
+			glm::uvec4 color;
+			if (matching && i < matched) {
+				color = Gamel::CORRECT_COLOR;
+			}	
+			else {
+				color = Gamel::DEFAULT_COLOR;
+			}
+			// Assumming only alpha characters
+			std::string text(1, s[i] - Gamel::LOWER_TO_UPPER_SHIFT); 
+			lines.draw_text(text,
+			glm::vec3(x, w->pos.y, 0.0),
+			glm::vec3(Gamel::TEXT_SIZE, 0.0f, 0.0f), glm::vec3(0.0f, Gamel::TEXT_SIZE, 0.0f),
+			color);
+		}
+	}
+
+	// Draw Score at bottom
+	constexpr float H = Gamel::HUD_SIZE;
+	float ofs = 2.0f / drawable_size.y;
+	std::string text = "Your score: " + std::to_string(player.score)  + "  Opponent's score: " + std::to_string(player.oppscore);
+	lines.draw_text(text,
+		glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
+		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+		Gamel::DEFAULT_COLOR);
+
+	GL_ERRORS();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	/*
 	static std::array< glm::vec2, 16 > const circle = [](){
 		std::array< glm::vec2, 16 > ret;
 		for (uint32_t a = 0; a < ret.size(); ++a) {
@@ -130,7 +215,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	);
-
+	*/
+	/*
 	{
 		DrawLines lines(world_to_clip);
 
@@ -178,5 +264,6 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			draw_text(player.position + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), player.name, 0.09f);
 		}
 	}
-	GL_ERRORS();
+	*/
+	
 }

@@ -1,9 +1,14 @@
 #pragma once
 
+
+
 #include <glm/glm.hpp>
+
+#include "Gamel.hpp"
 
 #include <string>
 #include <list>
+#include <unordered_set>
 #include <random>
 
 struct Connection;
@@ -26,27 +31,51 @@ struct Button {
 
 //state of one player in the game:
 struct Player {
+	Player() {
+		c2s_comp = "";
+		c2s_foropp = "";
+		s2c_opp = "";
+		s2c_self = "";
+		s2c_delete = "";
+
+	}
 	//player inputs (sent from client):
-	struct Controls {
-		Button left, right, up, down, jump;
+	void send_controls_message(Connection *connection);
 
-		void send_controls_message(Connection *connection) const;
-
-		//returns 'false' if no message or not a controls message,
-		//returns 'true' if read a controls message,
-		//throws on malformed controls message
-		bool recv_controls_message(Connection *connection);
-	} controls;
-
-	//player state (sent from server):
-	glm::vec2 position = glm::vec2(0.0f, 0.0f);
-	glm::vec2 velocity = glm::vec2(0.0f, 0.0f);
-
-	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
+	//returns 'false' if no message or not a controls message,
+	//returns 'true' if read a controls message,
+	//throws on malformed controls message
+	bool recv_controls_message(Connection *connection);
+	std::unordered_set<std::string> words;
+	Gamel::Playerl p;
 	std::string name = "";
+
+
+	// Connection related info
+	std::string s2c_opp;
+	std::string s2c_self;
+	std::string s2c_delete;
+	bool s2c_received = false;
+
+	std::string c2s_comp;
+	std::string c2s_foropp;
+	bool c2s_received = false;
+
+	float self_score = 0.f;
+	float opp_score = 0.f;
 };
 
 struct Game {
+
+	// Game logic here
+	Gamel::Gamel g;
+
+	Player *p1 = nullptr;
+	Player *p2 = nullptr;
+
+	float total_elapsed = 0.f;
+	bool can_make_word = true;
+
 	std::list< Player > players; //(using list so they can have stable addresses)
 	Player *spawn_player(); //add player the end of the players list (may also, e.g., play some spawn anim)
 	void remove_player(Player *); //remove player from game (may also, e.g., play some despawn anim)
@@ -78,7 +107,7 @@ struct Game {
 	//used by client:
 	//set game state from data in connection buffer
 	// (return true if data was read)
-	bool recv_state_message(Connection *connection);
+	bool recv_state_message(Connection *connection, Player *connection_player);
 
 	//used by server:
 	//send game state.
