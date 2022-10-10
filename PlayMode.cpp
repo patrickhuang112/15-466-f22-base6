@@ -71,9 +71,19 @@ void PlayMode::update(float elapsed) {
 
 	//queue data for sending to server:
 	playerconn.self_score = player.score;	
-	playerconn.c2s_comp = "TESTING";
-	playerconn.send_controls_message(&client.connection);
 
+	if (!player.words_to_send_self.empty()) {
+		playerconn.c2s_comp.emplace_back(player.words_to_send_self.front());
+		player.words_to_send_self.pop_front();
+	}	
+
+	if (!player.words_to_send_opp.empty()) {
+		playerconn.c2s_foropp.emplace_back(player.words_to_send_opp.front());
+		player.words_to_send_opp.pop_front();
+	}
+
+
+	playerconn.send_controls_message(&client.connection);
 
 	//send/receive data:
 	client.poll([this](Connection *c, Connection::Event event){
@@ -98,23 +108,24 @@ void PlayMode::update(float elapsed) {
 		}
 	}, 0.0);
 
-	if (playerconn.s2c_received) {
-		player.oppscore = playerconn.opp_score;
-		if (playerconn.s2c_delete != "" && player.has_word(playerconn.s2c_delete)) {
-			player.remove_word(playerconn.s2c_delete);
-			playerconn.s2c_delete = "";
+	player.oppscore = playerconn.opp_score;
+	while (!playerconn.s2c_delete.empty()) {
+		std::string s = playerconn.s2c_delete.front();
+		playerconn.s2c_delete.pop_front();
+		if (player.has_word(s)) {
+			player.remove_word(s);	
 		}
-		if (playerconn.s2c_opp != "") {
-			player.add_word(playerconn.s2c_opp, true);
-			playerconn.s2c_opp = "";
-		}
-		if (playerconn.s2c_self != "") {
-			player.add_word(playerconn.s2c_opp, false);
-			playerconn.s2c_self = "";
-		}
-		playerconn.s2c_received = false;
 	}
-
+	while (!playerconn.s2c_opp.empty()) {
+		std::string s = playerconn.s2c_opp.front();
+		playerconn.s2c_opp.pop_front();
+		player.add_word(s, true);
+	}
+	while (!playerconn.s2c_self.empty()) {
+		std::string s = playerconn.s2c_self.front();	
+		playerconn.s2c_self.pop_front();
+		player.add_word(s, false);
+	}
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
@@ -144,6 +155,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			}
 			++matched;
 		}
+		glm::vec4 word_color = w->lifetime == Gamel::DEFAULT_WORD_LIFETIME ? Gamel::DEFAULT_COLOR : Gamel::OPPONENT_COLOR;
 		for (size_t i = 0; i < s.length(); ++i) {
 			float x = w->pos.x + i * Gamel::LETTER_WIDTH;
 			glm::uvec4 color;
@@ -151,7 +163,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				color = Gamel::CORRECT_COLOR;
 			}	
 			else {
-				color = Gamel::DEFAULT_COLOR;
+				color = word_color;
 			}
 			// Assumming only alpha characters
 			std::string text(1, s[i] - Gamel::LOWER_TO_UPPER_SHIFT); 

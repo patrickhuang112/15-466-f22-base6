@@ -17,7 +17,11 @@ void Playerl::return_y(float y) {
 }
 
 void Playerl::add_word(const std::string& s, bool is_steal){
-    words.emplace_back(std::make_shared<Wordl>(s, DEFAULT_WORD_LIFETIME, get_y()));
+    float lifetime = is_steal ? OPP_WORD_LIFETIME : DEFAULT_WORD_LIFETIME;
+    words.emplace_back(std::make_shared<Wordl>(s, lifetime, get_y()));
+    if (is_steal) {
+        printf("OPP RECEIVED AND ADDED: %s\n", s.c_str());
+    }
     std::shared_ptr<TrieNode> cur = root; 
     for (size_t i = 0; i < s.length(); ++i) {
         char c = s[i];
@@ -53,10 +57,23 @@ void Playerl::move_words(float elapsed) {
     for (auto w : words) {
         if (w->move(elapsed)) {
             newlist.emplace_back(w); 
+            if (w->lifetime == DEFAULT_WORD_LIFETIME && w->remaining > DEFAULT_WORD_LIFETIME / 2.f && !w->sent_to_opp){
+                words_to_send_opp.emplace_back(w->s); 
+                printf("FIrst detect\n");
+                w->sent_to_opp = true;
+            }
         }
         else {
-            // ? 
+            return_y(w->pos.y);
+            if (w->lifetime == DEFAULT_WORD_LIFETIME) {
+                printf("REG DEAD\n");
+                words_to_send_self.emplace_back(w->s);
+            }
+            else {
+                printf("OPP DEAD\n");
+            }
         }
+        
     }
     words = newlist; 
 }
@@ -79,6 +96,7 @@ Match Playerl::match_letter(char c, std::string& completed) {
     
     while (it2 != words.end()) {
         if ((*it2)->s ==  visited[visited.size()-1]->word) {
+            return_y((*it2)->pos.y);
             words.erase(it2);
             break;
         }    
@@ -102,11 +120,13 @@ void Playerl::process_letter(char c) {
         // SFX?
         assert(completed != "");
         score += (static_cast<float>(completed.length()) * STEAL_MULTIPLIER);
+        words_to_send_self.emplace_back(completed);
     }
     else if (res == Match::WordSelf) {
         // SFX?
         assert(completed != "");
         score += (static_cast<float>(completed.length()));
+        words_to_send_self.emplace_back(completed);
     }
 }
 
@@ -139,6 +159,7 @@ void Playerl::remove_word(const std::string& s){
     auto it = words.begin();
     while (it != words.end()) {
         if ((*it)->s ==  v[v.size()-1]->word) {
+            return_y((*it)->pos.y);
             words.erase(it);
             return;
         }    
@@ -162,7 +183,7 @@ std::string Gamel::create_new_word() {
     double random_val = (dis(e) * std::time(0) * dis(e)) ;
     size_t mod = static_cast<size_t>(random_val) % words.size();
     const auto& it = std::next(words.begin(), mod);
-    const std::string& s = *it;
+    std::string s = *it;
     words.erase(it); 
     return s;
 }

@@ -28,14 +28,22 @@ const glm::u8vec4 CORRECT_COLOR = glm::u8vec4(0x44, 0xed, 0x69, 0x00);
 const glm::u8vec4 DEFAULT_COLOR = glm::u8vec4(0xff, 0xff, 0xff, 0x00);
 const glm::u8vec4 SELECTED_COLOR = glm::u8vec4(0x9f, 0x00, 0xcc, 0x00); 
 constexpr char LOWER_TO_UPPER_SHIFT = 32;
-constexpr float DEFAULT_WORD_LIFETIME = 6.0f;
+constexpr float DEFAULT_WORD_LIFETIME = 10.0f;
 constexpr float OPP_WORD_LIFETIME = DEFAULT_WORD_LIFETIME / 2.f;
 constexpr float DEFAULT_WORD_X_POSITION = 1.75f;
 constexpr float LETTER_WIDTH = 0.06f;
 constexpr float TEXT_SIZE = 0.15f;
 constexpr float HUD_SIZE = 0.11f;
 constexpr float STEAL_MULTIPLIER = 1.5f;
-constexpr uint32_t NEW_WORD_CYCLE = 2;
+constexpr uint32_t NEW_WORD_CYCLE = 8;
+
+constexpr float YPOS1 = 0.f;
+constexpr float YPOS2 = 0.3f;
+constexpr float YPOS3 = 0.8f;
+constexpr float YPOS4 = -0.3f;
+constexpr float YPOS5 = -0.8f;
+constexpr float YPOS6 = -0.55f;
+constexpr float YPOS7 = 0.55f;
 
 
 enum Match {
@@ -66,12 +74,15 @@ struct Wordl {
         this->lifetime = lifetime;
         pos = glm::vec2(DEFAULT_WORD_X_POSITION, y);
         velo = -(s.length() * LETTER_WIDTH + 2 * DEFAULT_WORD_X_POSITION) / lifetime;
+        remaining = 0.f;
+        sent_to_opp = false;
     }
     float velo;
     glm::vec2 pos;
     float lifetime;
     float remaining;
     std::string s;
+    bool sent_to_opp;
     bool move(float elapsed);
 };
 
@@ -80,11 +91,18 @@ struct Playerl {
     Playerl() {
         root = std::make_shared<TrieNode>('\0');
         visited.emplace_back(root);
-        available_ys.push_back(0.0f);
-        add_word("eefls", false);
+        available_ys.push_back(YPOS1);
+        available_ys.push_back(YPOS2);
+        available_ys.push_back(YPOS3);
+        available_ys.push_back(YPOS4);
+        available_ys.push_back(YPOS5);
+        available_ys.push_back(YPOS6);
+        available_ys.push_back(YPOS7);
         score = 0.f;
         oppscore = 0.f;
     }
+    std::list<std::string> words_to_send_self;
+    std::list<std::string> words_to_send_opp;
     std::list<std::shared_ptr<Wordl>> words;
     std::vector<std::shared_ptr<TrieNode>> visited;
     std::shared_ptr<TrieNode> root;
@@ -126,6 +144,7 @@ struct Gamel {
             }
             words.emplace(std::string(chars));
         }
+        printf("TOTAL WORDS!: %zd\n", words.size());
     }
     std::unordered_set<std::string> words;
 

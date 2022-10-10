@@ -32,11 +32,11 @@ struct Button {
 //state of one player in the game:
 struct Player {
 	Player() {
-		c2s_comp = "";
-		c2s_foropp = "";
-		s2c_opp = "";
-		s2c_self = "";
-		s2c_delete = "";
+		c2s_comp.clear();
+		c2s_foropp.clear();
+		s2c_opp.clear();
+		s2c_self.clear();
+		s2c_delete.clear();
 
 	}
 	//player inputs (sent from client):
@@ -52,14 +52,12 @@ struct Player {
 
 
 	// Connection related info
-	std::string s2c_opp;
-	std::string s2c_self;
-	std::string s2c_delete;
-	bool s2c_received = false;
+	std::list<std::string> s2c_opp;
+	std::list<std::string> s2c_self;
+	std::list<std::string> s2c_delete;
 
-	std::string c2s_comp;
-	std::string c2s_foropp;
-	bool c2s_received = false;
+	std::list<std::string> c2s_comp;
+	std::list<std::string> c2s_foropp;
 
 	float self_score = 0.f;
 	float opp_score = 0.f;

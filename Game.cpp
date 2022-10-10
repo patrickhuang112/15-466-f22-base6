@@ -38,20 +38,31 @@ void Player::send_controls_message(Connection *connection_) {
 	connection.send(l8);
 	connection.send(l0);
 
-	uint8_t complen = static_cast<uint8_t>(c2s_comp.length());
-	connection.send(complen);
-	for (char c : c2s_comp) {
-		connection.send(static_cast<uint8_t>(c));	
+	if (c2s_comp.empty()) {
+		connection.send(static_cast<uint8_t>(0));	
 	}
-
-	uint8_t foropplen = static_cast<uint8_t>(c2s_foropp.length());
-	connection.send(foropplen);
-	for (char c : c2s_foropp) {
-		connection.send(static_cast<uint8_t>(c));	
+	else {
+		std::string s = c2s_comp.front();	
+		c2s_comp.pop_front();
+		uint8_t complen = static_cast<uint8_t>(s.length());
+		connection.send(complen);
+		for (char c : s) {
+			connection.send(static_cast<uint8_t>(c));	
+		}
+		
 	}
-
-	c2s_comp = "";
-	c2s_foropp = "";
+	if (c2s_foropp.empty()) {
+		connection.send(static_cast<uint8_t>(0));	
+	}
+	else {
+		std::string s = c2s_foropp.front();	
+		c2s_foropp.pop_front();
+		uint8_t foropplen = static_cast<uint8_t>(s.length());
+		connection.send(foropplen);
+		for (char c : s) {
+			connection.send(static_cast<uint8_t>(c));	
+		}
+	}
 }
 
 bool Player::recv_controls_message(Connection *connection_) {
@@ -59,7 +70,7 @@ bool Player::recv_controls_message(Connection *connection_) {
 	auto &connection = *connection_;
 
 	auto &recv_buffer = connection.recv_buffer;
-	
+	bool something = false;	
 
 	float_to_int scoreu;	
 	if (recv_buffer.size() < 6) {
@@ -76,36 +87,35 @@ bool Player::recv_controls_message(Connection *connection_) {
 	size_t message_size = 5;
 	size_t complen = recv_buffer[message_size];
 	message_size++;
-	std::string comps = "";
 	if (complen > 0) {
 		for (size_t i = 0; i < complen; ++i) {
 			chars[i] = static_cast<char>(recv_buffer[message_size + i]);
 		}
 		chars[complen] = '\0';
 		message_size += complen;
-		comps = std::string(chars);
+		std::string comps = std::string(chars);
+		something = true;
+		c2s_comp.emplace_back(comps);
 	}	
 
 	size_t foropplen = recv_buffer[message_size];
 	message_size++;
-	std::string foropp = "";
 	if (foropplen > 0) {
 		for (size_t i = 0; i < foropplen; ++i) {
 			chars[i] = static_cast<char>(recv_buffer[message_size + i]);
 		}
 		chars[foropplen] = '\0';
 		message_size += foropplen;
-		foropp = std::string(chars);
+		std::string foropp = std::string(chars);
+		something = true;
+		c2s_foropp.emplace_back(foropp);
 	}	
 
 	self_score = scoreu.f;
-	c2s_comp = comps;
-	c2s_foropp = foropp;
-	c2s_received = true;
 	
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + message_size);
 
-	return true;
+	return !something;
 }
 
 
@@ -144,50 +154,47 @@ void Game::update(float elapsed) {
 	if (p1 == nullptr || p2 == nullptr) {
 		return;
 	}
-	if (p1->c2s_received) {
-		p2->opp_score = p1->self_score;	
-		if (p1->c2s_comp != "") {
-			if (p2->words.find(p1->c2s_comp) == p2->words.end()) {
-				assert(p1->words.find(p1->c2s_comp) != p1->words.end());
-				p1->words.erase(p1->c2s_comp);	
-			}
-			else {
-				p2->words.erase(p2->c2s_comp);
-			}
-			// Either way signal that the word is done and to be deleted
-			p2->s2c_delete = p1->c2s_comp;
-		}
+	p2->opp_score = p1->self_score;	
+	p1->opp_score = p2->self_score;
 
-		if (p1->c2s_foropp != "") {
-			p2->s2c_opp = p1->c2s_foropp;
+	while (!p1->c2s_comp.empty()) {
+		std::string s = p1->c2s_comp.front();
+		if (p2->words.find(s) == p2->words.end()) {
+			assert(p1->words.find(s) != p1->words.end());
+			p1->words.erase(s);	
 		}
+		else {
+			assert(p2->words.find(s) != p2->words.end());
+			p2->words.erase(s);
+		}	
+		p2->s2c_delete.emplace_back(s);
+		p1->c2s_comp.pop_front();
+	}
+	while (!p1->c2s_foropp.empty()) {
+		std::string s = p1->c2s_foropp.front();
+		p2->s2c_opp.emplace_back(s);	
+		p1->c2s_foropp.pop_front();
+	}
 
-		p1->c2s_comp = "";
-		p1->c2s_foropp = "";
-		p1->c2s_received = false;
-	}	
-	if (p2->c2s_received) {
-		p1->opp_score = p2->self_score;	
-		if (p2->c2s_comp != "") {
-			if (p1->words.find(p2->c2s_comp) == p1->words.end()) {
-				assert(p2->words.find(p2->c2s_comp) != p2->words.end());
-				p2->words.erase(p2->c2s_comp);	
-			}
-			else {
-				p1->words.erase(p1->c2s_comp);
-			}
-			// Either way signal that the word is done and to be deleted
-			p1->s2c_delete = p2->c2s_comp;
+	while (!p2->c2s_comp.empty()) {
+		std::string s = p2->c2s_comp.front();
+		if (p1->words.find(s) == p1->words.end()) {
+			assert(p2->words.find(s) != p2->words.end());
+			p2->words.erase(s);	
 		}
+		else {
+			assert(p1->words.find(s) != p1->words.end());
+			p1->words.erase(s);
+		}	
+		p1->s2c_delete.emplace_back(s);
+		p2->c2s_comp.pop_front();
+	}
+	while (!p2->c2s_foropp.empty()) {
+		std::string s = p2->c2s_foropp.front();
+		p1->s2c_opp.emplace_back(s);	
+		p2->c2s_foropp.pop_front();
+	}
 
-		if (p2->c2s_foropp != "") {
-			p1->s2c_opp = p2->c2s_foropp;
-		}
-
-		p2->c2s_foropp = "";
-		p2->c2s_comp = "";
-		p2->c2s_received = false;
-	}	
 
 	if (static_cast<uint32_t>(total_elapsed) % Gamel::NEW_WORD_CYCLE) {
 		if (can_make_word) {
@@ -195,8 +202,8 @@ void Game::update(float elapsed) {
 			const std::string& s2 = g.create_new_word();
 			p1->words.emplace(s1);
 			p2->words.emplace(s2);
-			p1->s2c_self = s1;
-			p2->s2c_self = s2;
+			p1->s2c_self.emplace_back(s1);
+			p2->s2c_self.emplace_back(s2);
 			can_make_word = false;
 		}
 	}
@@ -211,7 +218,7 @@ void Game::update(float elapsed) {
 void Game::send_state_message(Connection *connection_, Player *connection_player) const {
 	assert(connection_);
 	auto &connection = *connection_;
-
+	Player *p = connection_player;
 	/* [opponent score, 
 	 	new string size/string 
 		new opponent string to opp size/string
@@ -233,29 +240,50 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	connection.send(l8);
 	connection.send(l0);
 
-	uint8_t newlen = static_cast<uint8_t>(connection_player->s2c_self.length());
-	connection.send(newlen);
-	for (char c : connection_player->s2c_self) {
-		connection.send(static_cast<uint8_t>(c));	
-	}
 
-	uint8_t opplen = static_cast<uint8_t>(connection_player->s2c_opp.length());
-	connection.send(opplen);
-	for (char c : connection_player->s2c_opp) {
-		connection.send(static_cast<uint8_t>(c));	
+	if (p->s2c_self.empty()) {
+		connection.send(static_cast<uint8_t>(0));	
 	}
-
-	uint8_t deletelen = static_cast<uint8_t>(connection_player->s2c_delete.length());
-	connection.send(deletelen);
-	for (char c : connection_player->s2c_delete) {
-		connection.send(static_cast<uint8_t>(c));	
+	else {
+		std::string s = p->s2c_self.front();	
+		printf("Send state1: %s\n", s.c_str());
+		uint8_t len = static_cast<uint8_t>(s.length());
+		connection.send(len);
+		for (char c : s) {
+			connection.send(static_cast<uint8_t>(c));	
+		}
+		p->s2c_self.pop_front();
 	}
 
 
-	connection_player->s2c_self = "";
-	connection_player->s2c_opp = "";
-	connection_player->s2c_delete = "";
+	if (p->s2c_opp.empty()) {
+		connection.send(static_cast<uint8_t>(0));	
+	}
+	else {
+		std::string s = p->s2c_opp.front();	
+		printf("Send state2: %s\n", s.c_str());
+		uint8_t len = static_cast<uint8_t>(s.length());
+		connection.send(len);
+		for (char c : s) {
+			connection.send(static_cast<uint8_t>(c));	
+		}
+		p->s2c_opp.pop_front();
+	}
 
+
+	if (p->s2c_delete.empty()) {
+		connection.send(static_cast<uint8_t>(0));	
+	}
+	else {
+		std::string s = p->s2c_delete.front();	
+		printf("Send state3: %s\n", s.c_str());
+		uint8_t len = static_cast<uint8_t>(s.length());
+		connection.send(len);
+		for (char c : s) {
+			connection.send(static_cast<uint8_t>(c));	
+		}
+		p->s2c_delete.pop_front();
+	}
 }
 
 bool Game::recv_state_message(Connection *connection_, Player *p) {
@@ -274,52 +302,53 @@ bool Game::recv_state_message(Connection *connection_, Player *p) {
 	              | (uint32_t(recv_buffer[3]) << 8)
 	              |  uint32_t(recv_buffer[4]);
 	scoreu.i = size;
-	
+	bool something = false;	
 	char chars[BIG_ENOUGH_ARRAY];
 	size_t message_size = 5;
 	size_t newlen = recv_buffer[message_size];
 	message_size++;
-	std::string news = "";
 	if (newlen > 0) {
 		for (size_t i = 0; i < newlen; ++i) {
 			chars[i] = static_cast<char>(recv_buffer[message_size + i]);
 		}
 		chars[newlen] = '\0';
 		message_size += newlen;
-		news = std::string(chars);
+		std::string news = std::string(chars);
+		p->s2c_self.emplace_back(news);
+		something = true;
 	}	
 
 	size_t opplen = recv_buffer[message_size];
 	message_size++;
-	std::string opps = "";	
 	if (opplen > 0) {
 		for (size_t i = 0; i < opplen; ++i) {
 			chars[i] = static_cast<char>(recv_buffer[message_size + i]);
 		}
 		chars[opplen] = '\0';
 		message_size += opplen;
-		opps = std::string(chars);
+		std::string opps = std::string(chars);
+		something = true;
+		p->s2c_opp.emplace_back(opps);
+		printf("HERE2\n");
 	}
 
 	size_t deletelen = recv_buffer[message_size];
 	message_size++;
-	std::string deletes = "";	
 	if (deletelen > 0) {
 		for (size_t i = 0; i < deletelen; ++i) {
 			chars[i] = static_cast<char>(recv_buffer[message_size + i]);
 		}
 		chars[deletelen] = '\0';
 		message_size += deletelen;
-		deletes = std::string(chars);
+		std::string deletes = std::string(chars);
+		something = true;
+		p->s2c_delete.emplace_back(deletes);
+		printf("HERE3\n");
 	}	
 
 	p->opp_score = scoreu.f;
-	p->s2c_opp = opps;
-	p->s2c_self = news;
-	p->s2c_delete = deletes;
-	p->s2c_received = true;
 
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + message_size);
 
-	return true;
+	return !something;
 }
